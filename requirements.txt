@@ -1,0 +1,8 @@
+pillow
+
+# On Windows, to install Pillow without the required compilers for the pip install, do
+#   pip install wheel
+# and then grab the Pillow-4.0.0-*.whl matching your base Python from the downloads
+# page at https://pypi.python.org/pypi/Pillow/4.0.0#downloads, and run wheel install on it.
+# I got a compatibility warning, but forced the install and it didn't seem to be an issue
+# for the functionality I'm using.

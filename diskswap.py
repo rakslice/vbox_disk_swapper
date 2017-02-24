@@ -1,8 +1,12 @@
 import argparse
 import os
-import subprocess
 import sys
 
+import time
+
+from common import get_default_vboxmanage
+from textreader import TextReader
+from vmm import VBoxManage
 
 """
 A semi-automated script to feed numbered floppy disk images to VirtualBox.
@@ -10,11 +14,7 @@ A semi-automated script to feed numbered floppy disk images to VirtualBox.
 
 
 def parse_args():
-    if sys.platform == "win32":
-        program_files_path = os.environ.get("ProgramFilesW6432", r"C:\Program Files")
-        default_vboxmanage = os.path.join(program_files_path, r"Oracle\VirtualBox\VBoxManage.exe")
-    else:
-        default_vboxmanage = "VBoxManage"
+    default_vboxmanage = get_default_vboxmanage()
 
     parser = argparse.ArgumentParser()
     parser.add_argument("vm_name",
@@ -43,39 +43,11 @@ def parse_args():
                         help="disk device to swap",
                         default="Floppy-0-0",
                         dest="disk_device")
+    parser.add_argument("--ocr",
+                        help="OCR for restore next volume prompt",
+                        default=False,
+                        action="store_true")
     return parser.parse_args()
-
-
-def dequote(s):
-    """
-    Convert a potentially double-quoted string, removing the quotes and backslash-unescaping quoted contents
-    :type s: str
-    :rtype: str
-    """
-    if s.startswith('"') and s.endswith('"'):
-        s = s[1:-1]
-        s = s.replace('\\"', '"')
-        s = s.replace("\\\\", "\\")
-    return s
-
-
-def read_vbox_pairs(output_str):
-    """
-    Read VirtualBox --machinereadable output as a list of key-value pairs
-    :type output_str: str
-    :rtype: list of (str, str)
-    """
-    pairs = []
-    for line in output_str.split("\n"):
-        if line == "":
-            continue
-        if line.endswith("\r"):
-            line = line[:-1]
-        key, value = line.split("=", 1)
-        key = dequote(key)
-        value = dequote(value)
-        pairs.append((key, value))
-    return pairs
 
 
 def pairs_get(pairs, key):
@@ -123,42 +95,6 @@ def get_numbered_disks(disk_path, extension):
     return disks
 
 
-def deprefix(s, prefix):
-    """
-    Remove the given prefix from the string s if present
-    :type s: str
-    :type prefix: str
-    :return: str
-    """
-    if s.startswith(prefix):
-        s = s[len(prefix):]
-    return s
-
-
-def send_key_to_virtualbox(vboxmanage, vm_name, scan_code_value):
-    """
-    Simulate a press and release of the given key in a VirtualBox VM.
-
-    :param vboxmanage: Path & filename of VBoxManage.exe
-    :param vm_name: Name of the VirtualBox VM to interact with
-    :param vboxmanage: str
-    :type vm_name: str
-
-    :param scan_code_value: Scan code of the key to press.
-    This should be the key-down scan code (0 < code < 0x80)
-    For details see:
-    https://msdn.microsoft.com/en-us/library/aa299374(v=vs.60).aspx
-    https://www.win.tue.nl/~aeb/linux/kbd/scancodes-1.html
-
-    :type scan_code_value: int
-    """
-    assert isinstance(scan_code_value, int)
-    assert 0 <= scan_code_value <= 0x80
-    make_scancode = deprefix(hex(scan_code_value), "0x")
-    break_scancode = deprefix(hex(scan_code_value + 0x80), "0x")
-    subprocess.check_call([vboxmanage, "controlvm", vm_name, "keyboardputscancode", make_scancode, break_scancode])
-
-
 def main():
     options = parse_args()
 
@@ -169,6 +105,7 @@ def main():
     disk_device = options.disk_device
     keypress = options.keypress
     scancode = options.scancode
+    ocr = options.ocr
 
     if extension != "" and not extension.startswith("."):
         extension = "." + extension
@@ -176,9 +113,10 @@ def main():
     if vboxmanage != "VBoxManage":
         print "Using VBoxManage at %s" % vboxmanage
 
+    vm = VBoxManage(vboxmanage, vm_name)
+
     # subprocess.check_call([vboxmanage, vm_name, "--help"])
-    vm_info_raw = subprocess.check_output([vboxmanage, "showvminfo", vm_name, "--machinereadable"])
-    vm_info = read_vbox_pairs(vm_info_raw)
+    vm_info = vm.get_info()
 
     current_disk_image = pairs_get(vm_info, disk_device)
     print "Current disk image: %s" % current_disk_image
@@ -196,19 +134,32 @@ def main():
         pos = -1
     pos += 1
 
+    if ocr:
+        tr = TextReader()
+    else:
+        tr = None
+
     while pos < len(numbered_disks):
-        storagectl_name, storage_port, storage_dev = disk_device.split("-")
 
         prefix, num, filename_proper = numbered_disks[pos]
-        print "Press Enter to switch to %s" % filename_proper
-        sys.stdin.readline()
 
-        subprocess.check_call([vboxmanage, "storageattach", vm_name,
-                               "--storagectl", storagectl_name, "--port", storage_port, "--device", storage_dev,
-                               "--type", "fdd", "--medium", os.path.join(disk_path, filename_proper)])
+        if ocr:
+            print "Watching for prompt for volume %d: %s" % (num, filename_proper)
+            while True:
+                lines = tr.read(vm)
+                if lines[-1].startswith("...and press Enter to continue") and \
+                    lines[-2].startswith("Please mount volume %d on /dev/" % num):
+                    break
+                else:
+                    time.sleep(2)
+        else:
+            print "Press Enter to switch to %s" % filename_proper
+            sys.stdin.readline()
+
+        vm.insert_floppy_image(disk_device, os.path.join(disk_path, filename_proper))
 
         if keypress:
-            send_key_to_virtualbox(vboxmanage, vm_name, scancode)
+            vm.send_key_to_virtualbox(scancode)
 
         pos += 1
 
