@@ -150,17 +150,37 @@ class VBoxManage(object):
 
     def init_scan_codes_map(self):
         ascii_to_code_and_shift = {}
+
+        upper_codes = {0x02: "!@#$%^&*()_+"}
+
+        uppers_map = {'[': '{',
+                      ']': '}',
+                      ';': ':',
+                      '\\': '|',
+                      ',': '<',
+                      '.': '>',
+                      '/': '?',
+                      '\'': '"',
+                      '`': '~',
+                      }
+
         for s, start_code in [("qwertyuiop[]", 0x10),
-                              ("asdfghjkl;'", 0x1e),
+                              ("asdfghjkl;'`", 0x1e),
+                              ("\\", 0x2b),
                               ("zxcvbnm,./", 0x2c),
                               ("1234567890-=", 0x02),
                               ("\n", SCANCODE_ENTER),
                               (" ", SCANCODE_SPACE),
                               ]:
             code = start_code
-            for ch in s:
+            for i, ch in enumerate(s):
                 ascii_to_code_and_shift[ch] = (code, False)
-                ch_upper = ch.upper()
+                if ch in uppers_map:
+                    ch_upper = uppers_map[ch]
+                elif start_code in upper_codes:
+                    ch_upper = upper_codes[start_code][i]
+                else:
+                    ch_upper = ch.upper()
                 if ch_upper != ch:
                     ascii_to_code_and_shift[ch_upper] = (code, True)
 
