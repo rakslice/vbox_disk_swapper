@@ -217,6 +217,8 @@ class TextReader(object):
         self.ch_width = ch_width
         self.ch_height = ch_height
 
+        self.color_remaps = None
+
         if init_line_height is None:
             init_line_height = ch_height
         if normal_line_height is None:
@@ -233,10 +235,29 @@ class TextReader(object):
         # prefer space for empty bitmap
         self.ch_map[tuple([0] * ch_height)] = " "
 
+    def set_color_remaps(self, color_remaps):
+        self.color_remaps = color_remaps
+
+    def clear_color_remaps(self):
+        self.color_remaps = None
+
     def read(self, vm):
         """:type vm: VBoxManage"""
 
         ss_original, ss_filename = vm.get_screenshot()
+
+        if self.color_remaps is not None:
+            data = ss_original.getdata()
+            # ss_original = ss_original.copy()
+            unique_colors = set(data)
+            print "unique colors: %r" % unique_colors
+
+            for ch in unique_colors:
+                if ch not in self.color_remaps:
+                    self.color_remaps[ch] = (0, 0, 0)
+
+            ss_original.putdata([self.color_remaps[px] for px in data])
+
         ss = ss_original.convert("L", dither=Image.NONE)
 
         lines = read_textmode(ss, self.ch_map, self.ch_map_filename, self.ch_width, self.ch_height, self.line_height)
