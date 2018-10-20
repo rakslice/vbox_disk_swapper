@@ -59,6 +59,7 @@ SCANCODE_N = 0x31
 SCANCODE_Y = 0x15
 SCANCODE_SPACE = 0x39
 SCANCODE_SHIFT = 0x2a
+SCANCODE_CTRL = 0x1d  # left ctrl
 
 SCANCODE_PAGE_DOWN = 0x51  # keypad 3
 SCANCODE_PAGE_UP = 0x49  # keypad 9
@@ -211,3 +212,6 @@ class VBoxManage(object):
 
     def type_text(self, s):
         self._send_scancodes(self.scan_codes_for_text(s))
+
+    def type_ctrl_text(self, s):
+        self._send_scancodes([SCANCODE_CTRL] + self.scan_codes_for_text(s) + [SCANCODE_CTRL | 0x80])
