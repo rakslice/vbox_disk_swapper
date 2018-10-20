@@ -33,19 +33,27 @@ def parse_args():
     return parser.parse_args()
 
 
-def expect_messages(tr, vm, messages, interval_s=2, retry_on_error=False):
+class ExpectHangException(Exception):
+    def __init__(self, msg, lines, *args, **kwargs):
+        super(ExpectHangException, self).__init__(msg, *args, **kwargs)
+        self.lines = lines
+
+
+def expect_messages(tr, vm, messages, interval_s=2, retry_on_error=False, hang_time_limit=None):
     """
     :type tr: TextReader
     :type messages: list of str
     :type interval_s: float or int
     :type retry_on_error: bool
+    :type hang_time_limit: int or None
     """
     last_lines = None
+    hang_time = 0
     while True:
         while True:
             try:
                 lines = tr.read(vm)
-            except AssertionError:
+            except AssertionError:  # FIXME textreader should be providing well defined errors for these; this would need to change
                 if not retry_on_error:
                     raise
                 time.sleep(2)
@@ -53,6 +61,14 @@ def expect_messages(tr, vm, messages, interval_s=2, retry_on_error=False):
             break
 
         lines_changed = last_lines != lines
+        if lines_changed:
+            hang_time = 0
+            print repr(lines), repr(last_lines)
+        elif last_lines is not None:
+            hang_time += interval_s
+
+        if hang_time_limit is not None and hang_time > hang_time_limit:
+            raise ExpectHangException("Hang while expecting %r" % messages, lines)
 
         for line in lines:
             if SHOW_LINES and lines_changed:
