@@ -114,7 +114,8 @@ def read_textmode(image, ch_map, ch_map_filename, ch_width, ch_height, line_heig
             boxed = put_box_around(ch_image)
             while True:
                 boxed.show("Unknown character")
-                print "%s (%d,%d) Enter character:" % (ch_map_filename, row, col)
+                print "%s (%d,%d)" % (ch_map_filename, row, col)
+                print "Enter character:"
                 line_of_input = sys.stdin.readline().decode("utf-8")
                 assert line_of_input.endswith("\n")
                 ch = line_of_input[:-1]
