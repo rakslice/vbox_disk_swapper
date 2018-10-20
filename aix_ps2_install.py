@@ -38,6 +38,7 @@ def expect_messages(tr, vm, messages, interval_s=2, retry_on_error=False):
     :type tr: TextReader
     :type messages: list of str
     :type interval_s: float or int
+    :type retry_on_error: bool
     """
     last_lines = None
     while True:
@@ -62,7 +63,7 @@ def expect_messages(tr, vm, messages, interval_s=2, retry_on_error=False):
 
         last_lines = lines
 
-        print "Waiting for %r" % messages
+        print "Waiting for %r" % (messages, )
         time.sleep(interval_s)
 
 
