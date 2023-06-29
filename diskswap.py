@@ -71,7 +71,9 @@ def read_vbox_pairs(output_str):
             continue
         if line.endswith("\r"):
             line = line[:-1]
-        key, value = line.split("=", 1)
+        parts = line.split("=", 1)
+        if len(parts) != 2: continue
+        key, value = parts
         key = dequote(key)
         value = dequote(value)
         pairs.append((key, value))
@@ -174,14 +176,14 @@ def main():
         extension = "." + extension
 
     if vboxmanage != "VBoxManage":
-        print "Using VBoxManage at %s" % vboxmanage
+        print("Using VBoxManage at %s" % vboxmanage)
 
     # subprocess.check_call([vboxmanage, vm_name, "--help"])
     vm_info_raw = subprocess.check_output([vboxmanage, "showvminfo", vm_name, "--machinereadable"])
-    vm_info = read_vbox_pairs(vm_info_raw)
+    vm_info = read_vbox_pairs(vm_info_raw.decode("utf-8"))
 
     current_disk_image = pairs_get(vm_info, disk_device)
-    print "Current disk image: %s" % current_disk_image
+    print("Current disk image: %s" % current_disk_image)
 
     if disk_path is None:
         disk_path = os.path.dirname(current_disk_image)
@@ -200,7 +202,7 @@ def main():
         storagectl_name, storage_port, storage_dev = disk_device.split("-")
 
         prefix, num, filename_proper = numbered_disks[pos]
-        print "Press Enter to switch to %s" % filename_proper
+        print("Press Enter to switch to %s" % filename_proper)
         sys.stdin.readline()
 
         subprocess.check_call([vboxmanage, "storageattach", vm_name,
